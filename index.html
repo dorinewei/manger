@@ -14,13 +14,13 @@
 <body class="bg-slate-900 text-slate-100 min-h-screen">
 
     <!-- 頂部導覽列 -->
-    <header class="bg-slate-800/80 backdrop-blur-md sticky top-0 z-50 border-b border-slate-700">
+    <header class="bg-slate-800/85 backdrop-blur-md sticky top-0 z-50 border-b border-slate-700">
         <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
             <div class="flex items-center gap-3">
                 <span class="text-3xl">⛪</span>
                 <div>
                     <h1 class="text-xl font-bold text-amber-400">聖堂馬槽照片特展與票選</h1>
-                    <p class="text-xs text-slate-400">欣賞各方精美馬槽，投下您神聖的一票！</p>
+                    <p class="text-xs text-slate-400">欣賞各方精美馬槽，每人每張照片限投一票！</p>
                 </div>
             </div>
             <button onclick="openUploadModal()" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-5 py-2.5 rounded-xl shadow-lg transition-all flex items-center gap-2 cursor-pointer">
@@ -45,6 +45,15 @@
             <!-- 動態插入卡片 -->
         </div>
     </main>
+
+    <!-- 圖片放大預覽 Modal (Lightbox) -->
+    <div id="lightbox-modal" class="fixed inset-0 bg-black/90 z-50 hidden flex items-center justify-center p-4 cursor-pointer" onclick="closeLightbox()">
+        <div class="relative max-w-4xl max-h-[90vh]" onclick="event.stopPropagation()">
+            <button onclick="closeLightbox()" class="absolute -top-10 right-0 text-white text-2xl font-bold bg-slate-800/80 px-3 py-1 rounded-full hover:bg-slate-700">✕ 關閉</button>
+            <img id="lightbox-img" src="" alt="放大照片" class="max-w-full max-h-[80vh] rounded-xl object-contain shadow-2xl">
+            <p id="lightbox-caption" class="text-center text-slate-200 mt-3 font-medium text-lg"></p>
+        </div>
+    </div>
 
     <!-- 上傳彈窗 Modal -->
     <div id="upload-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
@@ -86,19 +95,25 @@
 
     <!-- 腳本邏輯 -->
     <script>
-        // 初始範例資料
+        // 初始照片清單（您可以隨時在此刪除或修改預設範例）
         let photos = [
-            { id: 1, title: '客廳的小巧溫馨馬槽', author: '瑪利亞', category: 'home', url: 'https://images.unsplash.com/photo-1543589077-47d81606c1bf?auto=format&fit=crop&w=600&q=80', votes: 12 },
-            { id: 2, title: '羅馬街頭偶然遇見的古老馬槽', author: '伯多祿', category: 'travel', url: 'https://images.unsplash.com/photo-1512389142860-9c449e580543?auto=format&fit=crop&w=600&q=80', votes: 19 },
-            { id: 3, title: '星空下的未來感AI馬槽', author: '若瑟', category: 'ai', url: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=600&q=80', votes: 25 }
+            // 若要刪除預設照片，直接把下面這幾行刪除即可；若要新增真實作品，改掉 url 即可
         ];
 
         let currentFilter = 'all';
 
-        // 初始化渲染
         window.onload = function() {
+            // 從瀏覽器記憶載入投票紀錄與最新照片
+            const savedPhotos = localStorage.getItem('manger_photos');
+            if (savedPhotos) {
+                photos = JSON.parse(savedPhotos);
+            }
             renderPhotos();
         };
+
+        function saveToStorage() {
+            localStorage.setItem('manger_photos', JSON.stringify(photos));
+        }
 
         function renderPhotos() {
             const grid = document.getElementById('photo-grid');
@@ -109,21 +124,28 @@
                 : photos.filter(p => p.category === currentFilter);
 
             if (filtered.length === 0) {
-                grid.innerHTML = `<div class="col-span-full text-center py-12 text-slate-500">目前這個分類還沒有照片，快來上傳第一張吧！</div>`;
+                grid.innerHTML = `<div class="col-span-full text-center py-16 text-slate-400 bg-slate-800/40 border border-slate-700 rounded-2xl">目前還沒有照片，點擊右上角「我要上傳馬槽照片」來分享第一張作品吧！</div>`;
                 return;
             }
 
+            // 檢查這支手機是否已經投過該張照片
+            let userVotes = JSON.parse(localStorage.getItem('manger_user_votes') || '{}');
+
             filtered.forEach(photo => {
                 const categoryNames = { home: '🏠 家裡佈置', travel: '🌍 旅途特別', ai: '🤖 AI 合成' };
+                const hasVoted = userVotes[photo.id] === true;
                 
                 const card = document.createElement('div');
                 card.className = 'bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden shadow-xl flex flex-col justify-between transition-transform duration-300 hover:-translate-y-1';
                 card.innerHTML = `
                     <div>
-                        <div class="relative h-56 overflow-hidden bg-slate-900">
-                            <img src="${photo.url}" alt="${photo.title}" class="w-full h-full object-cover">
+                        <div class="relative h-56 overflow-hidden bg-slate-900 cursor-pointer" onclick="openLightbox('${photo.url}', '${photo.title} (${photo.author})')">
+                            <img src="${photo.url}" alt="${photo.title}" class="w-full h-full object-cover transition-transform duration-500 hover:scale-105">
                             <span class="absolute top-3 left-3 bg-slate-900/80 backdrop-blur-md text-amber-400 text-xs px-3 py-1 rounded-full font-medium">
                                 ${categoryNames[photo.category]}
+                            </span>
+                            <span class="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm text-white text-xs px-2.5 py-1 rounded-lg">
+                                🔍 點擊看大圖
                             </span>
                         </div>
                         <div class="p-5">
@@ -135,8 +157,8 @@
                         <span class="text-amber-400 font-bold flex items-center gap-1.5">
                             <span>❤️</span> <span id="vote-count-${photo.id}">${photo.votes}</span> 票
                         </span>
-                        <button onclick="votePhoto(${photo.id})" class="bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-slate-950 border border-amber-500/30 px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer">
-                            👍 投這一票
+                        <button onclick="votePhoto(${photo.id})" id="vote-btn-${photo.id}" class="${hasVoted ? 'bg-slate-700 text-slate-400 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold cursor-pointer'} px-4 py-2 rounded-xl text-sm transition-all">
+                            ${hasVoted ? '✓ 已投過票' : '👍 投這一票'}
                         </button>
                     </div>
                 `;
@@ -162,11 +184,32 @@
             document.getElementById('upload-form').reset();
         }
 
+        function openLightbox(url, caption) {
+            document.getElementById('lightbox-img').src = url;
+            document.getElementById('lightbox-caption').innerText = caption;
+            document.getElementById('lightbox-modal').classList.remove('hidden');
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightbox-modal').classList.add('hidden');
+        }
+
         function votePhoto(id) {
+            let userVotes = JSON.parse(localStorage.getItem('manger_user_votes') || '{}');
+            
+            // 檢查是否投過
+            if (userVotes[id]) {
+                alert('這支手機或電腦已經投過這張照片囉！每人每張照片限投一票。');
+                return;
+            }
+
             const photo = photos.find(p => p.id === id);
             if (photo) {
                 photo.votes += 1;
-                document.getElementById(`vote-count-${id}`).innerText = photo.votes;
+                userVotes[id] = true;
+                localStorage.setItem('manger_user_votes', JSON.stringify(userVotes));
+                saveToStorage();
+                renderPhotos();
             }
         }
 
@@ -181,7 +224,7 @@
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     const newPhoto = {
-                        id: photos.length + 1,
+                        id: Date.now(),
                         title: title,
                         author: author,
                         category: category,
@@ -189,6 +232,7 @@
                         votes: 0
                     };
                     photos.unshift(newPhoto);
+                    saveToStorage();
                     renderPhotos();
                     closeUploadModal();
                     alert('上傳成功！照片已經即時展出囉。');
