@@ -42,7 +42,8 @@
 
         <!-- 照片卡片網格 -->
         <div id="photo-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            <!-- 動態插入卡片 -->
+            <!-- 動態載入中 -->
+            <div class="col-span-full text-center py-16 text-slate-400">正在從雲端載入作品...</div>
         </div>
     </main>
 
@@ -85,37 +86,66 @@
                     <input type="file" id="photo-file" accept="image/*" required class="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-amber-500 file:text-slate-950 hover:file:bg-amber-600 cursor-pointer">
                 </div>
 
+                <div id="upload-loading" class="hidden text-center text-amber-400 text-sm font-medium">正在上傳至雲端，請稍候...</div>
+
                 <div class="flex justify-end gap-3 mt-6">
-                    <button type="button" onclick="closeUploadModal()" class="px-5 py-2.5 rounded-xl bg-slate-700 text-slate-300 hover:bg-slate-600 cursor-pointer">取消</button>
-                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-amber-500 text-slate-950 font-bold hover:bg-amber-600 cursor-pointer">確認上傳</button>
+                    <button type="button" id="cancel-btn" onclick="closeUploadModal()" class="px-5 py-2.5 rounded-xl bg-slate-700 text-slate-300 hover:bg-slate-600 cursor-pointer">取消</button>
+                    <button type="submit" id="submit-btn" class="px-5 py-2.5 rounded-xl bg-amber-500 text-slate-950 font-bold hover:bg-amber-600 cursor-pointer">確認上傳</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- 腳本邏輯 -->
-    <script>
-        // 初始照片清單（您可以隨時在此刪除或修改預設範例）
-        let photos = [
-            // 若要刪除預設照片，直接把下面這幾行刪除即可；若要新增真實作品，改掉 url 即可
-        ];
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, updateDoc, doc, increment, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
-        let currentFilter = 'all';
-
-        window.onload = function() {
-            // 從瀏覽器記憶載入投票紀錄與最新照片
-            const savedPhotos = localStorage.getItem('manger_photos');
-            if (savedPhotos) {
-                photos = JSON.parse(savedPhotos);
-            }
-            renderPhotos();
+        const firebaseConfig = {
+            apiKey: "AIzaSyAtVJk_95jgXhe84Wjq6NuOgiEZKGD3JKU",
+            authDomain: "manger-vote.firebaseapp.com",
+            projectId: "manger-vote",
+            storageBucket: "manger-vote.firebasestorage.app",
+            messagingSenderId: "614894881061",
+            appId: "1:614894881061:web:ff6d164ef5c8e6881b32cc",
+            measurementId: "G-M738REBWJM"
         };
 
-        function saveToStorage() {
-            localStorage.setItem('manger_photos', JSON.stringify(photos));
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+
+        let photos = [];
+        let currentFilter = 'all';
+
+        // 即時監聽雲端資料庫變更
+        window.addEventListener('DOMContentLoaded', () => {
+            const q = collection(db, "photos");
+            onSnapshot(q, (snapshot) => {
+                photos = [];
+                snapshot.forEach((docSnap) => {
+                    photos.push({ id: docSnap.id, ...docSnap.data() });
+                });
+                // 依時間排序（新上傳的在前面）
+                photos.sort((a, b) => b.createdAt - a.createdAt);
+                renderPhotos();
+            }, (error) => {
+                console.error("資料載入失敗: ", error);
+                document.getElementById('photo-grid').innerHTML = `<div class="col-span-full text-center py-16 text-red-400 bg-slate-800/40 border border-red-700/50 rounded-2xl">載入雲端資料失敗，請確認 Firebase Firestore 規則是否已設為 test mode。</div>`;
+            });
+        });
+
+        window.filterCategory = function(cat) {
+            currentFilter = cat;
+            document.querySelectorAll('.category-btn').forEach(btn => {
+                btn.className = "category-btn px-5 py-2 rounded-full font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 transition-all cursor-pointer";
+            });
+            document.getElementById(`btn-${cat}`).className = "category-btn px-5 py-2 rounded-full font-medium bg-amber-500 text-slate-950 transition-all cursor-pointer";
+            renderPhotos();
         }
 
-        function renderPhotos() {
+        window.renderPhotos = function() {
             const grid = document.getElementById('photo-grid');
             grid.innerHTML = '';
 
@@ -128,7 +158,6 @@
                 return;
             }
 
-            // 檢查這支手機是否已經投過該張照片
             let userVotes = JSON.parse(localStorage.getItem('manger_user_votes') || '{}');
 
             filtered.forEach(photo => {
@@ -142,7 +171,7 @@
                         <div class="relative h-56 overflow-hidden bg-slate-900 cursor-pointer" onclick="openLightbox('${photo.url}', '${photo.title} (${photo.author})')">
                             <img src="${photo.url}" alt="${photo.title}" class="w-full h-full object-cover transition-transform duration-500 hover:scale-105">
                             <span class="absolute top-3 left-3 bg-slate-900/80 backdrop-blur-md text-amber-400 text-xs px-3 py-1 rounded-full font-medium">
-                                ${categoryNames[photo.category]}
+                                ${categoryNames[photo.category] || '🏠 家裡佈置'}
                             </span>
                             <span class="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm text-white text-xs px-2.5 py-1 rounded-lg">
                                 🔍 點擊看大圖
@@ -155,9 +184,9 @@
                     </div>
                     <div class="p-5 pt-0 flex items-center justify-between border-t border-slate-700/50 mt-4 pt-4">
                         <span class="text-amber-400 font-bold flex items-center gap-1.5">
-                            <span>❤️</span> <span id="vote-count-${photo.id}">${photo.votes}</span> 票
+                            <span>❤️</span> <span>${photo.votes || 0}</span> 票
                         </span>
-                        <button onclick="votePhoto(${photo.id})" id="vote-btn-${photo.id}" class="${hasVoted ? 'bg-slate-700 text-slate-400 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold cursor-pointer'} px-4 py-2 rounded-xl text-sm transition-all">
+                        <button onclick="votePhoto('${photo.id}')" class="${hasVoted ? 'bg-slate-700 text-slate-400 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold cursor-pointer'} px-4 py-2 rounded-xl text-sm transition-all">
                             ${hasVoted ? '✓ 已投過票' : '👍 投這一票'}
                         </button>
                     </div>
@@ -166,80 +195,92 @@
             });
         }
 
-        function filterCategory(cat) {
-            currentFilter = cat;
-            document.querySelectorAll('.category-btn').forEach(btn => {
-                btn.className = "category-btn px-5 py-2 rounded-full font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 transition-all cursor-pointer";
-            });
-            document.getElementById(`btn-${cat}`).className = "category-btn px-5 py-2 rounded-full font-medium bg-amber-500 text-slate-950 transition-all cursor-pointer";
-            renderPhotos();
-        }
-
-        function openUploadModal() {
+        window.openUploadModal = function() {
             document.getElementById('upload-modal').classList.remove('hidden');
         }
 
-        function closeUploadModal() {
+        window.closeUploadModal = function() {
             document.getElementById('upload-modal').classList.add('hidden');
             document.getElementById('upload-form').reset();
+            document.getElementById('upload-loading').classList.add('hidden');
         }
 
-        function openLightbox(url, caption) {
+        window.openLightbox = function(url, caption) {
             document.getElementById('lightbox-img').src = url;
             document.getElementById('lightbox-caption').innerText = caption;
             document.getElementById('lightbox-modal').classList.remove('hidden');
         }
 
-        function closeLightbox() {
+        window.closeLightbox = function() {
             document.getElementById('lightbox-modal').classList.add('hidden');
         }
 
-        function votePhoto(id) {
+        window.votePhoto = async function(id) {
             let userVotes = JSON.parse(localStorage.getItem('manger_user_votes') || '{}');
             
-            // 檢查是否投過
             if (userVotes[id]) {
                 alert('這支手機或電腦已經投過這張照片囉！每人每張照片限投一票。');
                 return;
             }
 
-            const photo = photos.find(p => p.id === id);
-            if (photo) {
-                photo.votes += 1;
+            try {
+                const photoRef = doc(db, "photos", id);
+                await updateDoc(photoRef, {
+                    votes: increment(1)
+                });
                 userVotes[id] = true;
                 localStorage.setItem('manger_user_votes', JSON.stringify(userVotes));
-                saveToStorage();
                 renderPhotos();
+            } catch (error) {
+                console.error("投票失敗: ", error);
+                alert("投票發生錯誤，請稍後再試！");
             }
         }
 
-        function handleUpload(event) {
+        document.getElementById('upload-form').addEventListener('submit', async function(event) {
             event.preventDefault();
             const author = document.getElementById('author-name').value;
             const category = document.getElementById('photo-category').value;
             const title = document.getElementById('photo-title').value;
             const fileInput = document.getElementById('photo-file');
 
-            if (fileInput.files && fileInput.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const newPhoto = {
-                        id: Date.now(),
-                        title: title,
-                        author: author,
-                        category: category,
-                        url: e.target.result,
-                        votes: 0
-                    };
-                    photos.unshift(newPhoto);
-                    saveToStorage();
-                    renderPhotos();
-                    closeUploadModal();
-                    alert('上傳成功！照片已經即時展出囉。');
-                }
-                reader.readAsDataURL(fileInput.files[0]);
+            if (!fileInput.files || !fileInput.files[0]) return;
+
+            const file = fileInput.files[0];
+            const loadingEl = document.getElementById('upload-loading');
+            const submitBtn = document.getElementById('submit-btn');
+            
+            loadingEl.classList.remove('hidden');
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            try {
+                // 1. 上傳照片至 Firebase Storage
+                const storageRef = ref(storage, `manger_photos/${Date.now()}_${file.name}`);
+                await uploadBytes(storageRef, file);
+                const downloadURL = await getDownloadURL(storageRef);
+
+                // 2. 將資料寫入 Firestore 資料庫
+                await addDoc(collection(db, "photos"), {
+                    title: title,
+                    author: author,
+                    category: category,
+                    url: downloadURL,
+                    votes: 0,
+                    createdAt: Date.now()
+                });
+
+                closeUploadModal();
+                alert('上傳成功！照片已經同步至雲端展出囉。');
+            } catch (error) {
+                console.error("上傳失敗: ", error);
+                alert("上傳失敗，請檢查網路連線或 Firebase 儲存空間設定。");
+            } finally {
+                loadingEl.classList.add('hidden');
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
             }
-        }
+        });
     </script>
 </body>
 </html>
