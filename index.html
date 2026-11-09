@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>聖堂馬槽照片特展與票選</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+
+    <!-- 頂部導覽列 -->
+    <header class="bg-slate-800/80 backdrop-blur-md sticky top-0 z-50 border-b border-slate-700">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <span class="text-3xl">⛪</span>
+                <div>
+                    <h1 class="text-xl font-bold text-amber-400">聖堂馬槽照片特展與票選</h1>
+                    <p class="text-xs text-slate-400">欣賞各方精美馬槽，投下您神聖的一票！</p>
+                </div>
+            </div>
+            <button onclick="openUploadModal()" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-5 py-2.5 rounded-xl shadow-lg transition-all flex items-center gap-2 cursor-pointer">
+                <span>📷</span> 我要上傳馬槽照片
+            </button>
+        </div>
+    </header>
+
+    <!-- 主內容區 -->
+    <main class="max-w-6xl mx-auto px-4 py-8">
+        
+        <!-- 分類標籤切換 -->
+        <div class="flex flex-wrap justify-center gap-2 mb-8">
+            <button onclick="filterCategory('all')" id="btn-all" class="category-btn px-5 py-2 rounded-full font-medium bg-amber-500 text-slate-950 transition-all cursor-pointer">全部作品</button>
+            <button onclick="filterCategory('home')" id="btn-home" class="category-btn px-5 py-2 rounded-full font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 transition-all cursor-pointer">🏠 家裡佈置</button>
+            <button onclick="filterCategory('travel')" id="btn-travel" class="category-btn px-5 py-2 rounded-full font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 transition-all cursor-pointer">🌍 旅途特別</button>
+            <button onclick="filterCategory('ai')" id="btn-ai" class="category-btn px-5 py-2 rounded-full font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 transition-all cursor-pointer">🤖 AI 合成</button>
+        </div>
+
+        <!-- 照片卡片網格 -->
+        <div id="photo-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- 動態插入卡片 -->
+        </div>
+    </main>
+
+    <!-- 上傳彈窗 Modal -->
+    <div id="upload-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 w-full max-w-lg rounded-2xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <h2 class="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2"><span>📤</span> 上傳您的馬槽作品</h2>
+            
+            <form id="upload-form" onsubmit="handleUpload(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-1">您的姓名 / 署名</label>
+                    <input type="text" id="author-name" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-slate-100 focus:outline-none focus:border-amber-500" placeholder="例如：若望媽媽">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-1">作品類別</label>
+                    <select id="photo-category" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-slate-100 focus:outline-none focus:border-amber-500">
+                        <option value="home">🏠 家裡佈置的馬槽</option>
+                        <option value="travel">🌍 旅途中看到的特別馬槽</option>
+                        <option value="ai">🤖 AI 合成的馬槽</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-1">作品標題與簡短故事</label>
+                    <input type="text" id="photo-title" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-slate-100 focus:outline-none focus:border-amber-500" placeholder="例如：平安夜的小角落">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-1">選擇照片檔案</label>
+                    <input type="file" id="photo-file" accept="image/*" required class="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-amber-500 file:text-slate-950 hover:file:bg-amber-600 cursor-pointer">
+                </div>
+
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button" onclick="closeUploadModal()" class="px-5 py-2.5 rounded-xl bg-slate-700 text-slate-300 hover:bg-slate-600 cursor-pointer">取消</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-amber-500 text-slate-950 font-bold hover:bg-amber-600 cursor-pointer">確認上傳</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 腳本邏輯 -->
+    <script>
+        // 初始範例資料
+        let photos = [
+            { id: 1, title: '客廳的小巧溫馨馬槽', author: '瑪利亞', category: 'home', url: 'https://images.unsplash.com/photo-1543589077-47d81606c1bf?auto=format&fit=crop&w=600&q=80', votes: 12 },
+            { id: 2, title: '羅馬街頭偶然遇見的古老馬槽', author: '伯多祿', category: 'travel', url: 'https://images.unsplash.com/photo-1512389142860-9c449e580543?auto=format&fit=crop&w=600&q=80', votes: 19 },
+            { id: 3, title: '星空下的未來感AI馬槽', author: '若瑟', category: 'ai', url: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=600&q=80', votes: 25 }
+        ];
+
+        let currentFilter = 'all';
+
+        // 初始化渲染
+        window.onload = function() {
+            renderPhotos();
+        };
+
+        function renderPhotos() {
+            const grid = document.getElementById('photo-grid');
+            grid.innerHTML = '';
+
+            const filtered = currentFilter === 'all' 
+                ? photos 
+                : photos.filter(p => p.category === currentFilter);
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `<div class="col-span-full text-center py-12 text-slate-500">目前這個分類還沒有照片，快來上傳第一張吧！</div>`;
+                return;
+            }
+
+            filtered.forEach(photo => {
+                const categoryNames = { home: '🏠 家裡佈置', travel: '🌍 旅途特別', ai: '🤖 AI 合成' };
+                
+                const card = document.createElement('div');
+                card.className = 'bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden shadow-xl flex flex-col justify-between transition-transform duration-300 hover:-translate-y-1';
+                card.innerHTML = `
+                    <div>
+                        <div class="relative h-56 overflow-hidden bg-slate-900">
+                            <img src="${photo.url}" alt="${photo.title}" class="w-full h-full object-cover">
+                            <span class="absolute top-3 left-3 bg-slate-900/80 backdrop-blur-md text-amber-400 text-xs px-3 py-1 rounded-full font-medium">
+                                ${categoryNames[photo.category]}
+                            </span>
+                        </div>
+                        <div class="p-5">
+                            <h3 class="font-bold text-lg text-slate-100 mb-1">${photo.title}</h3>
+                            <p class="text-sm text-slate-400">投稿人：${photo.author}</p>
+                        </div>
+                    </div>
+                    <div class="p-5 pt-0 flex items-center justify-between border-t border-slate-700/50 mt-4 pt-4">
+                        <span class="text-amber-400 font-bold flex items-center gap-1.5">
+                            <span>❤️</span> <span id="vote-count-${photo.id}">${photo.votes}</span> 票
+                        </span>
+                        <button onclick="votePhoto(${photo.id})" class="bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-slate-950 border border-amber-500/30 px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer">
+                            👍 投這一票
+                        </button>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function filterCategory(cat) {
+            currentFilter = cat;
+            document.querySelectorAll('.category-btn').forEach(btn => {
+                btn.className = "category-btn px-5 py-2 rounded-full font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 transition-all cursor-pointer";
+            });
+            document.getElementById(`btn-${cat}`).className = "category-btn px-5 py-2 rounded-full font-medium bg-amber-500 text-slate-950 transition-all cursor-pointer";
+            renderPhotos();
+        }
+
+        function openUploadModal() {
+            document.getElementById('upload-modal').classList.remove('hidden');
+        }
+
+        function closeUploadModal() {
+            document.getElementById('upload-modal').classList.add('hidden');
+            document.getElementById('upload-form').reset();
+        }
+
+        function votePhoto(id) {
+            const photo = photos.find(p => p.id === id);
+            if (photo) {
+                photo.votes += 1;
+                document.getElementById(`vote-count-${id}`).innerText = photo.votes;
+            }
+        }
+
+        function handleUpload(event) {
+            event.preventDefault();
+            const author = document.getElementById('author-name').value;
+            const category = document.getElementById('photo-category').value;
+            const title = document.getElementById('photo-title').value;
+            const fileInput = document.getElementById('photo-file');
+
+            if (fileInput.files && fileInput.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const newPhoto = {
+                        id: photos.length + 1,
+                        title: title,
+                        author: author,
+                        category: category,
+                        url: e.target.result,
+                        votes: 0
+                    };
+                    photos.unshift(newPhoto);
+                    renderPhotos();
+                    closeUploadModal();
+                    alert('上傳成功！照片已經即時展出囉。');
+                }
+                reader.readAsDataURL(fileInput.files[0]);
+            }
+        }
+    </script>
+</body>
+</html>
