@@ -43,4 +43,268 @@
         <!-- 照片卡片網格 -->
         <div id="photo-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             <!-- 動態載入中 -->
-            <div class="col-span-full text-center py-16 text-slate-400">正在
+            <div class="col-span-full text-center py-16 text-slate-400">正在從 Google 雲端載入作品與最新票數...</div>
+        </div>
+    </main>
+
+    <!-- 圖片放大預覽 Modal (Lightbox) -->
+    <div id="lightbox-modal" class="fixed inset-0 bg-black/90 z-50 hidden flex items-center justify-center p-4 cursor-pointer" onclick="closeLightbox()">
+        <div class="relative max-w-4xl max-h-[90vh]" onclick="event.stopPropagation()">
+            <button onclick="closeLightbox()" class="absolute -top-10 right-0 text-white text-2xl font-bold bg-slate-800/80 px-3 py-1 rounded-full hover:bg-slate-700">✕ 關閉</button>
+            <img id="lightbox-img" src="" alt="放大照片" class="max-w-full max-h-[80vh] rounded-xl object-contain shadow-2xl">
+            <p id="lightbox-caption" class="text-center text-slate-200 mt-3 font-medium text-lg"></p>
+        </div>
+    </div>
+
+    <!-- 上傳彈窗 Modal -->
+    <div id="upload-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 w-full max-w-lg rounded-2xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <h2 class="text-xl font-bold text-amber-400 mb-4 flex items-center gap-2"><span>📤</span> 上傳您的馬槽作品</h2>
+            
+            <form id="upload-form" onsubmit="handleUpload(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-1">您的姓名 / 署名</label>
+                    <input type="text" id="author-name" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-slate-100 focus:outline-none focus:border-amber-500" placeholder="例如：若望媽媽">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-1">作品類別</label>
+                    <select id="photo-category" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-slate-100 focus:outline-none focus:border-amber-500">
+                        <option value="home">🏠 家裡佈置的馬槽</option>
+                        <option value="travel">🌍 旅途中看到的特別馬槽</option>
+                        <option value="ai">🤖 AI 合成的馬槽</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-1">作品標題與簡短故事</label>
+                    <input type="text" id="photo-title" required class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-slate-100 focus:outline-none focus:border-amber-500" placeholder="例如：平安夜的小角落">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-1">選擇照片檔案</label>
+                    <input type="file" id="photo-file" accept="image/*" required class="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-amber-500 file:text-slate-950 hover:file:bg-amber-600 cursor-pointer">
+                </div>
+
+                <div id="upload-loading" class="hidden text-center text-amber-400 text-sm font-medium">正在上傳至 Google 雲端，請稍候...</div>
+
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button" id="cancel-btn" onclick="closeUploadModal()" class="px-5 py-2.5 rounded-xl bg-slate-700 text-slate-300 hover:bg-slate-600 cursor-pointer">取消</button>
+                    <button type="submit" id="submit-btn" class="px-5 py-2.5 rounded-xl bg-amber-500 text-slate-950 font-bold hover:bg-amber-600 cursor-pointer">確認上傳</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 串接 Google Apps Script 邏輯 -->
+    <script>
+        // 已填入您的最新 Google Apps Script 網頁應用程式網址
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxU4g6BlVfEJD0ZWk3ZFp9POtZlYZG4nhGEU-oOF0pVxBnH9W2d_JChQfjohwmElPv2w/exec';
+
+        let photos = [];
+        let currentFilter = 'all';
+
+        // 網頁載入時從 Google 試算表讀取所有作品
+        window.addEventListener('DOMContentLoaded', () => {
+            loadPhotos();
+        });
+
+        async function loadPhotos() {
+            try {
+                const response = await fetch(SCRIPT_URL);
+                const result = await response.json();
+                if (result.success) {
+                    photos = result.photos || [];
+                    photos.sort((a, b) => b.createdAt - a.createdAt); // 新上傳的排在前面
+                    renderPhotos();
+                } else {
+                    throw new Error('載入失敗');
+                }
+            } catch (error) {
+                console.error("資料載入失敗: ", error);
+                document.getElementById('photo-grid').innerHTML = `<div class="col-span-full text-center py-16 text-red-400 bg-slate-800/40 border border-red-700/50 rounded-2xl">載入雲端資料失敗，請確認 Apps Script 部署網址是否正確。</div>`;
+            }
+        }
+
+        window.filterCategory = function(cat) {
+            currentFilter = cat;
+            document.querySelectorAll('.category-btn').forEach(btn => {
+                btn.className = "category-btn px-5 py-2 rounded-full font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 transition-all cursor-pointer";
+            });
+            document.getElementById(`btn-${cat}`).className = "category-btn px-5 py-2 rounded-full font-medium bg-amber-500 text-slate-950 transition-all cursor-pointer";
+            renderPhotos();
+        }
+
+        window.renderPhotos = function() {
+            const grid = document.getElementById('photo-grid');
+            grid.innerHTML = '';
+
+            const filtered = currentFilter === 'all' 
+                ? photos 
+                : photos.filter(p => p.category === currentFilter);
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `<div class="col-span-full text-center py-16 text-slate-400 bg-slate-800/40 border border-slate-700 rounded-2xl">目前還沒有照片，點擊右上角「我要上傳馬槽照片」來分享第一張作品吧！</div>`;
+                return;
+            }
+
+            let userVotes = JSON.parse(localStorage.getItem('manger_user_votes') || '{}');
+
+            filtered.forEach(photo => {
+                const categoryNames = { home: '🏠 家裡佈置', travel: '🌍 旅途特別', ai: '🤖 AI 合成' };
+                const hasVoted = userVotes[photo.id] === true;
+                
+                const card = document.createElement('div');
+                card.className = 'bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden shadow-xl flex flex-col justify-between transition-transform duration-300 hover:-translate-y-1';
+                card.innerHTML = `
+                    <div>
+                        <div class="relative h-56 overflow-hidden bg-slate-900 cursor-pointer" onclick="openLightbox('${photo.url}', '${photo.title} (${photo.author})')">
+                            <img src="${photo.url}" alt="${photo.title}" class="w-full h-full object-cover transition-transform duration-500 hover:scale-105">
+                            <span class="absolute top-3 left-3 bg-slate-900/80 backdrop-blur-md text-amber-400 text-xs px-3 py-1 rounded-full font-medium">
+                                ${categoryNames[photo.category] || '🏠 家裡佈置'}
+                            </span>
+                            <span class="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm text-white text-xs px-2.5 py-1 rounded-lg">
+                                🔍 點擊看大圖
+                            </span>
+                        </div>
+                        <div class="p-5">
+                            <h3 class="font-bold text-lg text-slate-100 mb-1">${photo.title}</h3>
+                            <p class="text-sm text-slate-400">投稿人：${photo.author}</p>
+                        </div>
+                    </div>
+                    <div class="p-5 pt-0 flex items-center justify-between border-t border-slate-700/50 mt-4 pt-4">
+                        <span class="text-amber-400 font-bold flex items-center gap-1.5">
+                            <span>❤️</span> <span id="votes-${photo.id}">${photo.votes || 0}</span> 票
+                        </span>
+                        <button onclick="votePhoto('${photo.id}')" id="btn-vote-${photo.id}" class="${hasVoted ? 'bg-slate-700 text-slate-400 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold cursor-pointer'} px-4 py-2 rounded-xl text-sm transition-all">
+                            ${hasVoted ? '✓ 已投過票' : '👍 投這一票'}
+                        </button>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        window.openUploadModal = function() {
+            document.getElementById('upload-modal').classList.remove('hidden');
+        }
+
+        window.closeUploadModal = function() {
+            document.getElementById('upload-modal').classList.add('hidden');
+            document.getElementById('upload-form').reset();
+            document.getElementById('upload-loading').classList.add('hidden');
+        }
+
+        window.openLightbox = function(url, caption) {
+            document.getElementById('lightbox-img').src = url;
+            document.getElementById('lightbox-caption').innerText = caption;
+            document.getElementById('lightbox-modal').classList.remove('hidden');
+        }
+
+        window.closeLightbox = function() {
+            document.getElementById('lightbox-modal').classList.add('hidden');
+        }
+
+        // 串接真實後端投票同步
+        window.votePhoto = async function(id) {
+            let userVotes = JSON.parse(localStorage.getItem('manger_user_votes') || '{}');
+            
+            if (userVotes[id]) {
+                alert('這支手機或電腦已經投過這張照片囉！每人每張照片限投一票。');
+                return;
+            }
+
+            const btn = document.getElementById(`btn-vote-${id}`);
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = '投票中...';
+            }
+
+            try {
+                const response = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'vote', id: id })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    userVotes[id] = true;
+                    localStorage.setItem('manger_user_votes', JSON.stringify(userVotes));
+
+                    const photo = photos.find(p => p.id === id);
+                    if (photo) {
+                        photo.votes = result.votes;
+                    }
+                    renderPhotos();
+                    alert('投票成功！感謝您的參與 ❤️');
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                console.error("投票失敗: ", error);
+                alert("投票發生錯誤，請稍後再試！");
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = '👍 投這一票';
+                }
+            }
+        }
+
+        window.handleUpload = async function(event) {
+            event.preventDefault();
+            const author = document.getElementById('author-name').value;
+            const category = document.getElementById('photo-category').value;
+            const title = document.getElementById('photo-title').value;
+            const fileInput = document.getElementById('photo-file');
+
+            if (!fileInput.files || !fileInput.files[0]) return;
+
+            const file = fileInput.files[0];
+            const loadingEl = document.getElementById('upload-loading');
+            const submitBtn = document.getElementById('submit-btn');
+            
+            loadingEl.classList.remove('hidden');
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = async function () {
+                const base64Data = reader.result;
+                const payload = {
+                    file: base64Data,
+                    filename: file.name,
+                    mimeType: file.type,
+                    title: title,
+                    author: author,
+                    category: category
+                };
+
+                try {
+                    const response = await fetch(SCRIPT_URL, {
+                        method: 'POST',
+                        body: JSON.stringify(payload)
+                    });
+                    const result = await response.json();
+
+                    if (result.success) {
+                        photos.unshift(result.photo); // 加到最前面
+                        closeUploadModal();
+                        renderPhotos();
+                        alert('上傳成功！照片已經同步至雲端展出囉。');
+                    } else {
+                        throw new Error(result.error);
+                    }
+                } catch (error) {
+                    console.error("上傳失敗: ", error);
+                    alert("上傳失敗，請檢查網路連線或 Apps Script 設定。");
+                } finally {
+                    loadingEl.classList.add('hidden');
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            };
+        }
+    </script>
+</body>
+</html>
