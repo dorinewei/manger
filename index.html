@@ -30,7 +30,7 @@
     </main>
 
     <!-- 上傳彈跳視窗 -->
-    <div id="upload-modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4">
+    <div id="upload-modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
         <div class="bg-white rounded-xl p-6 max-w-md w-full shadow-xl">
             <h2 class="text-2xl font-bold mb-4 text-amber-900">上傳馬槽照片</h2>
             <form id="upload-form" onsubmit="handleUploadSubmit(event)" class="space-y-4">
@@ -51,7 +51,7 @@
                     <input type="text" id="up-uploader" required class="w-full border rounded-lg p-2" placeholder="例如：瑪利亞">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium mb-1">選擇照片檔案（會自動最佳化壓縮）</label>
+                    <label class="block text-sm font-medium mb-1">選擇照片檔案（上傳時會自動壓縮）</label>
                     <input type="file" id="up-file" accept="image/*" required class="w-full border rounded-lg p-2">
                 </div>
                 <div class="flex justify-end gap-2 mt-6">
@@ -63,10 +63,13 @@
     </div>
 
     <script>
-        const API_URL = "您的_Google_Apps_Script_部署網址"; // <--- 請記得維持您原本正確的 Apps Script 網址
+        // 已經為您換上最新的 Google Apps Script API 網址
+        const API_URL = "https://script.google.com/macros/s/AKfycbxU4g6BlVfEJD0ZWk3ZFp9POtZlYJZG4nhGEU-oOF0pVXbnH9W2d_JChQfjohwmEIPv2w/exec";
+        
         let currentCategory = 'home';
         let allPhotos = [];
 
+        // 產生裝置專屬代碼，防止洗票
         let deviceToken = localStorage.getItem('manger_token');
         if (!deviceToken) {
             deviceToken = 'DEV_' + Math.random().toString(36).substring(2) + Date.now();
@@ -109,17 +112,20 @@
                 return;
             }
 
-            grid.innerHTML = filtered.map(p => `
+            // 越晚上傳的排在越前面
+            const reversedPhotos = [...filtered].reverse();
+
+            grid.innerHTML = reversedPhotos.map(p => `
                 <div class="bg-white rounded-xl shadow-md overflow-hidden flex flex-col">
-                    <img src="${p.imageUrl}" alt="${p.title}" class="h-56 w-full object-cover cursor-pointer" onclick="window.open('${p.imageUrl}', '_blank')">
+                    <img src="${p.imageUrl}" alt="${p.title}" class="h-56 w-full object-cover cursor-pointer hover:opacity-90 transition" onclick="window.open('${p.imageUrl}', '_blank')">
                     <div class="p-4 flex flex-col flex-grow justify-between">
                         <div>
                             <h3 class="font-bold text-lg text-amber-900">${p.title}</h3>
-                            <p class="text-sm text-gray-500">提供者：${p.uploader}</p>
+                            <p class="text-sm text-gray-500 mt-1">提供者：${p.uploader}</p>
                         </div>
-                        <div class="mt-4 flex justify-between items-center">
+                        <div class="mt-4 flex justify-between items-center border-t pt-3">
                             <span class="text-amber-700 font-bold">❤️ 獲得 ${p.votes} 票</span>
-                            <button onclick="votePhoto('${p.id}')" class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow">為它投票</button>
+                            <button onclick="votePhoto('${p.id}')" class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow transition">為它投票</button>
                         </div>
                     </div>
                 </div>
@@ -129,7 +135,7 @@
         function openUploadModal() { document.getElementById('upload-modal').classList.remove('hidden'); }
         function closeUploadModal() { document.getElementById('upload-modal').classList.add('hidden'); }
 
-        // 圖片壓縮輔助函數 (將大圖自動縮減至長寬最大 1200px 並壓縮畫質)
+        // 圖片自動壓縮功能（將高畫素大檔案縮小，避免上傳失敗）
         function compressImage(file) {
             return new Promise((resolve) => {
                 const reader = new FileReader();
@@ -161,7 +167,7 @@
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
 
-                        // 壓縮為 JPEG，品質 0.8
+                        // 壓縮成 JPEG 格式，品質 0.8
                         const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
                         resolve(dataUrl);
                     };
@@ -172,14 +178,14 @@
         async function handleUploadSubmit(e) {
             e.preventDefault();
             const btn = document.getElementById('submit-btn');
-            btn.innerText = "處理並上傳中...";
+            btn.innerText = "圖片處理與上傳中...";
             btn.disabled = true;
 
             const fileInput = document.getElementById('up-file');
             const file = fileInput.files[0];
             
             try {
-                // 自動壓縮圖片
+                // 執行背景自動壓縮
                 const compressedDataUrl = await compressImage(file);
 
                 const payload = {
@@ -204,12 +210,14 @@
                     alert("上傳成功！");
                     closeUploadModal();
                     document.getElementById('upload-form').reset();
+                    // 重新抓取資料以更新畫面
                     fetchPhotos();
                 } else {
-                    alert("上傳失敗：" + result.message);
+                    alert("上傳失敗：" + (result.message || "發生未知錯誤"));
                 }
             } catch (err) {
-                alert("發生錯誤：" + err);
+                alert("上傳過程發生錯誤，請稍後再試。");
+                console.error(err);
             } finally {
                 btn.innerText = "確認上傳";
                 btn.disabled = false;
@@ -231,14 +239,18 @@
                 if (result.status === 'success') {
                     alert("投票成功！謝謝您的參與 ❤️");
                     fetchPhotos();
-                } else {
+                } else if (result.status === 'voted') {
                     alert(result.message);
+                } else {
+                    alert("投票發生問題：" + result.message);
                 }
             } catch (err) {
-                alert("投票發生錯誤");
+                alert("投票發生錯誤，請檢查網路連線。");
+                console.error(err);
             }
         }
 
+        // 網頁載入時自動抓取相片資料
         fetchPhotos();
     </script>
 </body>
