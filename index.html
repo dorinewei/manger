@@ -20,7 +20,7 @@
             <ul class="list-disc list-inside text-amber-800 space-y-1 text-sm sm:text-base">
                 <li><strong>盡情支持：</strong>遇到喜歡的作品都可以投，總票數無上限！</li>
                 <li><strong>每件一票：</strong>每張相片每人限投一次。</li>
-                <li><strong>截止日期：</strong>投票將於 <strong>2026 / 12 / 20</strong> 截止，敬請把握時間。</li>
+                <li><strong>截止日期：</strong>投票將於 <strong>2026 / 12 / 20 晚上12點</strong> 截止，敬請把握時間。</li>
             </ul>
         </div>
 
@@ -77,6 +77,9 @@
         // 您的 Google Apps Script API 網址
         const API_URL = "https://script.google.com/macros/s/AKfycbxU4g6BlVfEJD0ZWk3ZFp9POtZlYJZG4nhGEU-oOF0pVXbnH9W2d_JChQfjohwmEIPv2w/exec";
         
+        // 設定投票截止時間：2026年12月20日 23:59:59 (台灣時間)
+        const DEADLINE = new Date('2026-12-20T23:59:59+08:00').getTime();
+
         let currentCategory = 'home';
         let allPhotos = [];
 
@@ -123,10 +126,23 @@
                 return;
             }
 
+            // 判斷現在是否已經超過截止時間
+            const now = new Date().getTime();
+            const isVotingClosed = now > DEADLINE;
+
             // 越晚上傳的排在越前面
             const reversedPhotos = [...filtered].reverse();
 
-            grid.innerHTML = reversedPhotos.map(p => `
+            grid.innerHTML = reversedPhotos.map(p => {
+                // 根據是否截止，決定按鈕的樣式與功能
+                let voteButton = '';
+                if (isVotingClosed) {
+                    voteButton = `<button disabled class="bg-gray-400 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow cursor-not-allowed">投票已截止</button>`;
+                } else {
+                    voteButton = `<button onclick="votePhoto('${p.id}')" class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow transition">為它投票</button>`;
+                }
+
+                return `
                 <div class="bg-white rounded-xl shadow-md overflow-hidden flex flex-col">
                     <img src="${p.imageUrl}" alt="${p.title}" class="h-56 w-full object-cover cursor-pointer hover:opacity-90 transition" onclick="window.open('${p.imageUrl}', '_blank')">
                     <div class="p-4 flex flex-col flex-grow justify-between">
@@ -136,11 +152,12 @@
                         </div>
                         <div class="mt-4 flex justify-between items-center border-t pt-3">
                             <span class="text-amber-700 font-bold">❤️ 獲得 ${p.votes} 票</span>
-                            <button onclick="votePhoto('${p.id}')" class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow transition">為它投票</button>
+                            ${voteButton}
                         </div>
                     </div>
                 </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
         function openUploadModal() { document.getElementById('upload-modal').classList.remove('hidden'); }
@@ -178,7 +195,6 @@
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
 
-                        // 壓縮成 JPEG 格式，品質 0.8
                         const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
                         resolve(dataUrl);
                     };
@@ -196,7 +212,6 @@
             const file = fileInput.files[0];
             
             try {
-                // 執行背景自動壓縮
                 const compressedDataUrl = await compressImage(file);
 
                 const payload = {
@@ -221,7 +236,6 @@
                     alert("上傳成功！");
                     closeUploadModal();
                     document.getElementById('upload-form').reset();
-                    // 重新抓取資料以更新畫面
                     fetchPhotos();
                 } else {
                     alert("上傳失敗：" + (result.message || "發生未知錯誤"));
