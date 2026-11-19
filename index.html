@@ -25,13 +25,22 @@
         </div>
 
         <!-- 分類導覽與上傳按鈕 -->
-        <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
-            <div class="flex gap-2">
+        <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
+            <div class="flex flex-wrap gap-2">
                 <button onclick="switchTab('home')" id="btn-home" class="px-4 py-2 rounded-lg font-bold bg-amber-700 text-white shadow">🏠 家裡佈置</button>
                 <button onclick="switchTab('travel')" id="btn-travel" class="px-4 py-2 rounded-lg font-bold bg-amber-200 text-amber-900">✈️ 旅途見聞</button>
                 <button onclick="switchTab('ai')" id="btn-ai" class="px-4 py-2 rounded-lg font-bold bg-amber-200 text-amber-900">🤖 AI 創作</button>
             </div>
             <button onclick="openUploadModal()" class="bg-emerald-700 hover:bg-emerald-800 text-white px-5 py-2 rounded-lg font-bold shadow">📤 上傳我的馬槽照片</button>
+        </div>
+
+        <!-- 3個類別說明 -->
+        <div class="bg-white/80 border border-amber-200 rounded-xl p-4 mb-6 shadow-sm">
+            <ul class="space-y-1.5 text-sm sm:text-base text-gray-700">
+                <li>🏠 <strong>家裡佈置：</strong>溫馨的居家馬槽</li>
+                <li>✈️ <strong>旅途見聞：</strong>旅行中遇見的特別馬槽</li>
+                <li>🤖 <strong>AI 創作：</strong>發揮創意生成的專屬馬槽</li>
+            </ul>
         </div>
 
         <!-- 照片展示網格 -->
@@ -134,7 +143,6 @@
             const reversedPhotos = [...filtered].reverse();
 
             grid.innerHTML = reversedPhotos.map(p => {
-                // 根據是否截止，決定按鈕的樣式與功能
                 let voteButton = '';
                 if (isVotingClosed) {
                     voteButton = `<button disabled class="bg-gray-400 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow cursor-not-allowed">投票已截止</button>`;
